@@ -97,3 +97,4 @@ choirapp/
 - `npm run lint` - 執行 ESLint 檢查
 
 # activity-score
+# activity-score
