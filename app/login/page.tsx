@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import { registerUser, loginUser } from '@/lib/firebase-auth';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
+// 強制動態渲染，避免預渲染時 ThemeProvider 未初始化
+export const dynamic = 'force-dynamic';
+
 export default function LoginPage() {
   const router = useRouter();
   const [isRegister, setIsRegister] = useState(false);

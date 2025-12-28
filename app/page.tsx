@@ -8,6 +8,9 @@ import { getUserActivities, createActivity, updateActivity, getActivityByPin, hi
 import { Activity, User } from '@/types';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
+// 強制動態渲染，因為需要認證檢查
+export const dynamic = 'force-dynamic';
+
 export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
