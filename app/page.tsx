@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { onAuthStateChange, getCurrentAuthUser, logoutUser, getUserData } from '@/lib/firebase-auth';
-import { getActivitiesByOwner, createActivity, updateActivity, getActivityByPin } from '@/lib/firebase-db';
+import { getUserActivities, createActivity, updateActivity, getActivityByPin, hideActivity, joinActivity } from '@/lib/firebase-db';
 import { Activity, User } from '@/types';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
@@ -35,8 +35,8 @@ export default function HomePage() {
       const userData = await getUserData(firebaseUser.uid);
       if (userData) {
         setUser(userData);
-        // 載入該使用者的活動列表
-        const userActivities = await getActivitiesByOwner(firebaseUser.uid);
+        // 載入該使用者的活動列表（包括擁有的和加入的）
+        const userActivities = await getUserActivities(firebaseUser.uid);
         setActivities(userActivities);
       }
       setLoading(false);
@@ -52,7 +52,7 @@ export default function HomePage() {
 
   const loadActivities = async () => {
     if (user) {
-      const userActivities = await getActivitiesByOwner(user.id);
+      const userActivities = await getUserActivities(user.id);
       setActivities(userActivities);
     }
   };
@@ -82,14 +82,36 @@ export default function HomePage() {
       return;
     }
 
+    if (!user) {
+      setPinError('請先登入');
+      return;
+    }
+
     const activity = await getActivityByPin(pinCode.trim());
     if (!activity) {
       setPinError('找不到此 PIN 碼對應的活動');
       return;
     }
 
-    // 成功找到活動，導向活動頁面
-    router.push(`/activity/${activity.id}`);
+    // 檢查活動是否已被移除
+    if (activity.deleted) {
+      setPinError('此活動已被移除');
+      return;
+    }
+
+    // 建立用戶與活動的關聯
+    const success = await joinActivity(user.id, activity.id);
+    if (success) {
+      // 重新載入活動列表
+      await loadActivities();
+      // 關閉 Modal
+      setShowPinModal(false);
+      setPinCode('');
+      // 導向活動頁面
+      router.push(`/activity/${activity.id}`);
+    } else {
+      setPinError('加入活動失敗，請稍後再試');
+    }
   };
 
   const handleEditActivity = (activity: Activity) => {
@@ -111,6 +133,17 @@ export default function HomePage() {
       setEditingActivity(null);
       setEditActivityName('');
       setEditActivityDesc('');
+    }
+  };
+
+  const handleHideActivity = async (activityId: string) => {
+    if (!user) return;
+    
+    if (confirm('確定要移除這個活動嗎？活動將從列表中隱藏，但資料不會被刪除。')) {
+      const success = await hideActivity(activityId, user.id);
+      if (success) {
+        await loadActivities();
+      }
     }
   };
 
@@ -190,15 +223,26 @@ export default function HomePage() {
                       </p>
                     </div>
                   </Link>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleEditActivity(activity);
-                    }}
-                    className="ml-4 px-3 py-1 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                  >
-                    編輯
-                  </button>
+                  <div className="ml-4 flex flex-col gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleEditActivity(activity);
+                      }}
+                      className="px-3 py-1 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                    >
+                      編輯
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleHideActivity(activity.id);
+                      }}
+                      className="px-3 py-1 text-sm text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                    >
+                      移除
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

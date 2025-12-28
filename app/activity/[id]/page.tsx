@@ -118,12 +118,14 @@ export default function ActivityPage() {
     if (selectedParticipant && activityId && scorePoints && scoreReason.trim()) {
       const points = parseInt(scorePoints);
       if (!isNaN(points)) {
-        await addScore(selectedParticipant.id, activityId, points, scoreReason.trim());
-        setScorePoints('');
-        setScoreReason('');
-        setShowScoreModal(false);
-        setSelectedParticipant(null);
-        await loadActivityData();
+        const result = await addScore(selectedParticipant.id, activityId, points, scoreReason.trim());
+        if (result) {
+          setScorePoints('');
+          setScoreReason('');
+          setShowScoreModal(false);
+          setSelectedParticipant(null);
+          await loadActivityData();
+        }
       }
     }
   };
@@ -367,7 +369,7 @@ export default function ActivityPage() {
       
       // 處理 CSV 行，支援引號包裹的值
       const values = line.match(/(".*?"|[^,]+)(?=\s*,|\s*$)/g) || [];
-      if (values.length > 0) {
+      if (values.length > 0 && values[0]) {
         // 移除引號和空白
         const name = values[0].replace(/^["']|["']$/g, '').trim();
         if (name) {

@@ -13,7 +13,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db, generatePin } from './firebase';
-import { Activity, Participant, ScoreRecord } from '@/types';
+import { Activity, Participant, ScoreRecord, UserActivity } from '@/types';
 
 // 將 Firestore Timestamp 轉換為 ISO 字串
 function timestampToISO(timestamp: any): string {
@@ -53,11 +53,12 @@ export async function createActivity(name: string, description: string | undefin
       pinExists = !pinSnapshot.empty;
     }
 
-    const newActivity: Omit<Activity, 'id' | 'createdAt'> & { createdAt: any } = {
+    const newActivity: Omit<Activity, 'id' | 'createdAt'> & { createdAt: any; deleted?: boolean } = {
       name: name.trim(),
       description: description?.trim() || undefined,
       pin: pin!,
       ownerId,
+      deleted: false,
       createdAt: serverTimestamp(),
     };
 
@@ -69,6 +70,7 @@ export async function createActivity(name: string, description: string | undefin
       description: newActivity.description,
       pin: newActivity.pin,
       ownerId: newActivity.ownerId,
+      deleted: false,
       createdAt: new Date().toISOString(),
     };
   } catch (error) {
@@ -122,21 +124,32 @@ export async function getActivityByPin(pin: string): Promise<Activity | null> {
 export async function getActivitiesByOwner(ownerId: string): Promise<Activity[]> {
   try {
     const activitiesRef = collection(db, 'activities');
+    // 移除 orderBy 以避免需要複合索引，改為在客戶端排序
     const q = query(
       activitiesRef,
-      where('ownerId', '==', ownerId),
-      orderBy('createdAt', 'desc')
+      where('ownerId', '==', ownerId)
     );
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        createdAt: timestampToISO(data.createdAt),
-      } as Activity;
+    const result = snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: timestampToISO(data.createdAt),
+        } as Activity;
+      })
+      .filter(activity => !activity.deleted); // 過濾掉已移除的活動
+    
+    // 在客戶端按建立時間降序排序
+    result.sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return dateB - dateA; // 降序排序（最新的在前）
     });
+    
+    return result;
   } catch (error) {
     console.error('取得活動列表失敗:', error);
     return [];
@@ -174,6 +187,99 @@ export async function updateActivity(id: string, name: string, description: stri
   } catch (error) {
     console.error('更新活動失敗:', error);
     return null;
+  }
+}
+
+// 隱藏活動（標記為已移除，不實際刪除）
+export async function hideActivity(id: string, ownerId: string): Promise<boolean> {
+  try {
+    const activity = await getActivity(id);
+    if (!activity || activity.ownerId !== ownerId) {
+      return false;
+    }
+
+    await updateDoc(doc(db, 'activities', id), {
+      deleted: true,
+    });
+
+    return true;
+  } catch (error) {
+    console.error('隱藏活動失敗:', error);
+    return false;
+  }
+}
+
+// 用戶參與活動相關
+// 加入活動（建立用戶與活動的關聯）
+export async function joinActivity(userId: string, activityId: string): Promise<boolean> {
+  try {
+    // 檢查是否已經加入
+    const userActivitiesRef = collection(db, 'userActivities');
+    const q = query(
+      userActivitiesRef,
+      where('userId', '==', userId),
+      where('activityId', '==', activityId)
+    );
+    const snapshot = await getDocs(q);
+    
+    if (!snapshot.empty) {
+      return true; // 已經加入
+    }
+
+    // 建立關聯
+    await addDoc(userActivitiesRef, {
+      userId,
+      activityId,
+      joinedAt: serverTimestamp(),
+    });
+
+    return true;
+  } catch (error) {
+    console.error('加入活動失敗:', error);
+    return false;
+  }
+}
+
+// 取得用戶參與的所有活動（包括擁有的和加入的）
+export async function getUserActivities(userId: string): Promise<Activity[]> {
+  try {
+    // 取得用戶擁有的活動
+    const ownedActivities = await getActivitiesByOwner(userId);
+    
+    // 取得用戶參與的活動 ID 列表
+    const userActivitiesRef = collection(db, 'userActivities');
+    const q = query(
+      userActivitiesRef,
+      where('userId', '==', userId)
+    );
+    const snapshot = await getDocs(q);
+    
+    const joinedActivityIds = new Set(snapshot.docs.map(doc => doc.data().activityId));
+    
+    // 取得用戶加入的活動（排除已擁有的）
+    const joinedActivities: Activity[] = [];
+    for (const activityId of joinedActivityIds) {
+      // 檢查是否已經在擁有的活動列表中
+      if (!ownedActivities.find(a => a.id === activityId)) {
+        const activity = await getActivity(activityId);
+        if (activity && !activity.deleted) {
+          joinedActivities.push(activity);
+        }
+      }
+    }
+    
+    // 合併並排序
+    const allActivities = [...ownedActivities, ...joinedActivities];
+    allActivities.sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return dateB - dateA; // 降序排序（最新的在前）
+    });
+    
+    return allActivities;
+  } catch (error) {
+    console.error('取得用戶活動列表失敗:', error);
+    return [];
   }
 }
 
@@ -370,14 +476,14 @@ export async function addScore(participantId: string, activityId: string, points
 export async function getScoresByParticipant(participantId: string): Promise<ScoreRecord[]> {
   try {
     const scoresRef = collection(db, 'scores');
+    // 移除 orderBy 以避免需要複合索引，改為在客戶端排序
     const q = query(
       scoresRef,
-      where('participantId', '==', participantId),
-      orderBy('createdAt', 'desc')
+      where('participantId', '==', participantId)
     );
     const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => {
+    const result = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
         id: doc.id,
@@ -385,6 +491,15 @@ export async function getScoresByParticipant(participantId: string): Promise<Sco
         createdAt: timestampToISO(data.createdAt),
       } as ScoreRecord;
     });
+    
+    // 在客戶端按建立時間降序排序
+    result.sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return dateB - dateA; // 降序排序（最新的在前）
+    });
+    
+    return result;
   } catch (error) {
     console.error('取得分數記錄失敗:', error);
     return [];
@@ -437,10 +552,23 @@ export async function updateScore(id: string, points: number, reason: string): P
 }
 
 export async function getParticipantTotalScore(participantId: string): Promise<number> {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/82d648a9-ecf5-4615-98cb-c5c714638fca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/firebase-db.ts:555',message:'getParticipantTotalScore entry',data:{participantId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
   try {
     const scores = await getScoresByParticipant(participantId);
-    return scores.reduce((total, score) => total + score.points, 0);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/82d648a9-ecf5-4615-98cb-c5c714638fca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/firebase-db.ts:558',message:'getParticipantTotalScore after getScoresByParticipant',data:{scoresCount:scores.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+    const total = scores.reduce((total, score) => total + score.points, 0);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/82d648a9-ecf5-4615-98cb-c5c714638fca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/firebase-db.ts:560',message:'getParticipantTotalScore return',data:{total},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+    return total;
   } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/82d648a9-ecf5-4615-98cb-c5c714638fca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/firebase-db.ts:562',message:'getParticipantTotalScore error',data:{error:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     console.error('計算總分失敗:', error);
     return 0;
   }

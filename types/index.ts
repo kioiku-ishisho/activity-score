@@ -12,6 +12,7 @@ export interface Activity {
   pin: string; // 6位數字 PIN 碼
   ownerId: string; // 活動擁有者 ID
   createdAt: string;
+  deleted?: boolean; // 是否已移除（隱藏）
 }
 
 export interface Participant {
@@ -31,5 +32,12 @@ export interface ScoreRecord {
 
 export interface ParticipantWithScore extends Participant {
   totalScore: number;
+}
+
+export interface UserActivity {
+  id: string;
+  userId: string;
+  activityId: string;
+  joinedAt: string;
 }
 
