@@ -62,9 +62,20 @@ export function getActivities(): Activity[] {
   return activities.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-export function createActivity(name: string, description?: string): Activity {
+export function createActivity(name: string, description?: string): Activity | null {
   initStorage();
   const activities: Activity[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACTIVITIES) || '[]');
+  
+  // 檢查是否已存在相同名稱和描述的活動
+  const exists = activities.some(a => 
+    a.name.trim() === name.trim() && 
+    (a.description || '').trim() === (description || '').trim()
+  );
+  
+  if (exists) {
+    return null; // 返回 null 表示重複
+  }
+  
   const newActivity: Activity = {
     id: Date.now().toString(),
     name,
@@ -89,9 +100,20 @@ export function getParticipantsByActivity(activityId: string): Participant[] {
   return participants.filter(p => p.activityId === activityId);
 }
 
-export function createParticipant(name: string, activityId: string): Participant {
+export function createParticipant(name: string, activityId: string): Participant | null {
   initStorage();
   const participants: Participant[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.PARTICIPANTS) || '[]');
+  
+  // 檢查同一活動中是否已存在相同姓名的參加者
+  const exists = participants.some(p => 
+    p.activityId === activityId && 
+    p.name.trim() === name.trim()
+  );
+  
+  if (exists) {
+    return null; // 返回 null 表示重複
+  }
+  
   const newParticipant: Participant = {
     id: Date.now().toString(),
     name,
@@ -108,15 +130,31 @@ export function createParticipantsBatch(names: string[], activityId: string): Pa
   const newParticipants: Participant[] = [];
   const baseTime = Date.now();
   
+  // 取得該活動中已存在的參加者姓名
+  const existingNames = new Set(
+    participants
+      .filter(p => p.activityId === activityId)
+      .map(p => p.name.trim().toLowerCase())
+  );
+  
   names.forEach((name, index) => {
-    if (name.trim()) {
-      const newParticipant: Participant = {
-        id: (baseTime + index).toString(),
-        name: name.trim(),
-        activityId,
-      };
-      participants.push(newParticipant);
-      newParticipants.push(newParticipant);
+    const trimmedName = name.trim();
+    if (trimmedName) {
+      // 檢查是否重複（在同一活動中，或在此次批量匯入中）
+      const nameLower = trimmedName.toLowerCase();
+      const isDuplicate = existingNames.has(nameLower) || 
+        newParticipants.some(p => p.name.trim().toLowerCase() === nameLower);
+      
+      if (!isDuplicate) {
+        const newParticipant: Participant = {
+          id: (baseTime + index).toString(),
+          name: trimmedName,
+          activityId,
+        };
+        participants.push(newParticipant);
+        newParticipants.push(newParticipant);
+        existingNames.add(nameLower);
+      }
     }
   });
   
@@ -190,6 +228,17 @@ export function updateActivity(id: string, name: string, description?: string): 
   const index = activities.findIndex(a => a.id === id);
   if (index === -1) return null;
   
+  // 檢查是否已存在相同名稱和描述的活動（排除自己）
+  const exists = activities.some(a => 
+    a.id !== id &&
+    a.name.trim() === name.trim() && 
+    (a.description || '').trim() === (description || '').trim()
+  );
+  
+  if (exists) {
+    return null; // 返回 null 表示重複
+  }
+  
   activities[index] = {
     ...activities[index],
     name,
@@ -205,6 +254,19 @@ export function updateParticipant(id: string, name: string): Participant | null 
   const participants: Participant[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.PARTICIPANTS) || '[]');
   const index = participants.findIndex(p => p.id === id);
   if (index === -1) return null;
+  
+  const participant = participants[index];
+  
+  // 檢查同一活動中是否已存在相同姓名的參加者（排除自己）
+  const exists = participants.some(p => 
+    p.id !== id &&
+    p.activityId === participant.activityId && 
+    p.name.trim() === name.trim()
+  );
+  
+  if (exists) {
+    return null; // 返回 null 表示重複
+  }
   
   participants[index] = {
     ...participants[index],

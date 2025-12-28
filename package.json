@@ -6,13 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check-firebase": "node scripts/check-firebase-config.js"
   },
   "dependencies": {
     "next": "^14.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-hook-form": "^7.48.0"
+    "react-hook-form": "^7.48.0",
+    "firebase": "^10.7.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -23,7 +25,8 @@
     "postcss": "^8.4.0",
     "autoprefixer": "^10.4.0",
     "eslint": "^8.0.0",
-    "eslint-config-next": "^14.0.0"
+    "eslint-config-next": "^14.0.0",
+    "dotenv": "^16.3.1"
   }
 }
 

@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 使用者資料：只能讀寫自己的資料
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // 活動資料：所有人都可以讀取，只有擁有者可以寫入
+    match /activities/{activityId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+    }
+    
+    // 參加者資料：所有人都可以讀取，已登入使用者可以寫入
+    match /participants/{participantId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // 分數記錄：所有人都可以讀取，已登入使用者可以寫入
+    match /scores/{scoreId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}
+

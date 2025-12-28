@@ -3,16 +3,16 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { onAuthStateChange, getUserData } from '@/lib/firebase-auth';
 import {
-  getCurrentUser,
   getParticipant,
   getActivity,
   getScoresByParticipant,
   getParticipantTotalScore,
   addScore,
   updateScore,
-} from '@/lib/storage';
-import { Participant, Activity, ScoreRecord } from '@/types';
+} from '@/lib/firebase-db';
+import { Participant, Activity, ScoreRecord, User } from '@/types';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { formatDateTime } from '@/lib/utils';
 
@@ -21,11 +21,12 @@ export default function ParticipantPage() {
   const params = useParams();
   const participantId = params.id as string;
 
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [scores, setScores] = useState<ScoreRecord[]>([]);
   const [totalScore, setTotalScore] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [showAddScoreModal, setShowAddScoreModal] = useState(false);
   const [showEditScoreModal, setShowEditScoreModal] = useState(false);
   const [editingScore, setEditingScore] = useState<ScoreRecord | null>(null);
@@ -35,30 +36,38 @@ export default function ParticipantPage() {
   const [editScoreReason, setEditScoreReason] = useState('');
 
   useEffect(() => {
-    const currentUser = getCurrentUser();
-    if (!currentUser) {
-      router.push('/login');
-      return;
-    }
-    setUser(currentUser);
-    loadParticipantData();
+    const unsubscribe = onAuthStateChange(async (firebaseUser) => {
+      if (!firebaseUser) {
+        router.push('/login');
+        return;
+      }
+      
+      const userData = await getUserData(firebaseUser.uid);
+      if (userData) {
+        setUser(userData);
+        await loadParticipantData();
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [participantId, router]);
 
-  const loadParticipantData = () => {
-    const participantData = getParticipant(participantId);
+  const loadParticipantData = async () => {
+    const participantData = await getParticipant(participantId);
     if (!participantData) {
       router.push('/');
       return;
     }
     setParticipant(participantData);
 
-    const activityData = getActivity(participantData.activityId);
+    const activityData = await getActivity(participantData.activityId);
     setActivity(activityData);
 
-    const scoresData = getScoresByParticipant(participantId);
+    const scoresData = await getScoresByParticipant(participantId);
     setScores(scoresData);
 
-    const total = getParticipantTotalScore(participantId);
+    const total = await getParticipantTotalScore(participantId);
     setTotalScore(total);
   };
 
@@ -69,37 +78,41 @@ export default function ParticipantPage() {
     setShowEditScoreModal(true);
   };
 
-  const handleAddScore = (e: React.FormEvent) => {
+  const handleAddScore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (participant && activity && addScorePoints && addScoreReason.trim()) {
       const points = parseInt(addScorePoints);
       if (!isNaN(points)) {
-        addScore(participant.id, activity.id, points, addScoreReason.trim());
+        await addScore(participant.id, activity.id, points, addScoreReason.trim());
         setAddScorePoints('');
         setAddScoreReason('');
         setShowAddScoreModal(false);
-        loadParticipantData();
+        await loadParticipantData();
       }
     }
   };
 
-  const handleUpdateScore = (e: React.FormEvent) => {
+  const handleUpdateScore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingScore && editScorePoints && editScoreReason.trim()) {
       const points = parseInt(editScorePoints);
       if (!isNaN(points)) {
-        updateScore(editingScore.id, points, editScoreReason.trim());
+        await updateScore(editingScore.id, points, editScoreReason.trim());
         setEditScorePoints('');
         setEditScoreReason('');
         setShowEditScoreModal(false);
         setEditingScore(null);
-        loadParticipantData();
+        await loadParticipantData();
       }
     }
   };
 
-  if (!user || !participant) {
-    return null;
+  if (loading || !user || !participant) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-gray-600 dark:text-gray-300">載入中...</div>
+      </div>
+    );
   }
 
   return (

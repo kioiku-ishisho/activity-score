@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { onAuthStateChange, getUserData } from '@/lib/firebase-auth';
 import {
-  getCurrentUser,
   getActivity,
   getParticipantsByActivity,
   createParticipant,
@@ -14,82 +14,116 @@ import {
   getScoresByActivity,
   addScore,
   getParticipantTotalScore,
-} from '@/lib/storage';
-import { Activity, Participant, ParticipantWithScore } from '@/types';
+  getScoresByParticipant,
+} from '@/lib/firebase-db';
+import { Activity, Participant, ParticipantWithScore, ScoreRecord, User } from '@/types';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import {
+  generateScoreListCSV,
+  generateParticipantDetailCSV,
+  generateTimeSequenceCSV,
+  downloadCSV,
+  ExportType,
+} from '@/lib/csv-export';
+import { formatDateTime } from '@/lib/utils';
 
 export default function ActivityPage() {
   const router = useRouter();
   const params = useParams();
   const activityId = params.id as string;
 
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [participants, setParticipants] = useState<ParticipantWithScore[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showAddParticipantModal, setShowAddParticipantModal] = useState(false);
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [showEditParticipantModal, setShowEditParticipantModal] = useState(false);
   const [showBatchScoreModal, setShowBatchScoreModal] = useState(false);
   const [showDeleteParticipantModal, setShowDeleteParticipantModal] = useState(false);
   const [showImportCsvModal, setShowImportCsvModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportType, setExportType] = useState<ExportType>('score-list');
+  const [exportPreview, setExportPreview] = useState<string>('');
+  const [exportPreviewData, setExportPreviewData] = useState<any[]>([]);
+  const [selectedExportParticipant, setSelectedExportParticipant] = useState<string>('');
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const [deletingParticipant, setDeletingParticipant] = useState<Participant | null>(null);
   const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set());
   const [newParticipantName, setNewParticipantName] = useState('');
   const [editParticipantName, setEditParticipantName] = useState('');
+  const [participantError, setParticipantError] = useState('');
   const [scorePoints, setScorePoints] = useState('');
   const [scoreReason, setScoreReason] = useState('');
   const [batchScorePoints, setBatchScorePoints] = useState('');
   const [batchScoreReason, setBatchScoreReason] = useState('');
 
   useEffect(() => {
-    const currentUser = getCurrentUser();
-    if (!currentUser) {
-      router.push('/login');
-      return;
-    }
-    setUser(currentUser);
-    loadActivityData();
+    const unsubscribe = onAuthStateChange(async (firebaseUser) => {
+      if (!firebaseUser) {
+        router.push('/login');
+        return;
+      }
+      
+      const userData = await getUserData(firebaseUser.uid);
+      if (userData) {
+        setUser(userData);
+        await loadActivityData();
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [activityId, router]);
 
-  const loadActivityData = () => {
-    const activityData = getActivity(activityId);
+  const loadActivityData = async () => {
+    const activityData = await getActivity(activityId);
     if (!activityData) {
       router.push('/');
       return;
     }
     setActivity(activityData);
 
-    const participantsData = getParticipantsByActivity(activityId);
-    const participantsWithScores: ParticipantWithScore[] = participantsData.map((p) => ({
-      ...p,
-      totalScore: getParticipantTotalScore(p.id),
-    }));
+    const participantsData = await getParticipantsByActivity(activityId);
+    const participantsWithScores: ParticipantWithScore[] = await Promise.all(
+      participantsData.map(async (p) => {
+        const totalScore = await getParticipantTotalScore(p.id);
+        return {
+          ...p,
+          totalScore,
+        };
+      })
+    );
     setParticipants(participantsWithScores);
   };
 
-  const handleAddParticipant = (e: React.FormEvent) => {
+  const handleAddParticipant = async (e: React.FormEvent) => {
     e.preventDefault();
+    setParticipantError('');
     if (newParticipantName.trim() && activityId) {
-      createParticipant(newParticipantName.trim(), activityId);
+      const result = await createParticipant(newParticipantName.trim(), activityId);
+      if (result === null) {
+        setParticipantError('此活動中已存在相同姓名的參加者');
+        return;
+      }
       setNewParticipantName('');
       setShowAddParticipantModal(false);
-      loadActivityData();
+      await loadActivityData();
     }
   };
 
-  const handleAddScore = (e: React.FormEvent) => {
+  const handleAddScore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedParticipant && activityId && scorePoints && scoreReason.trim()) {
       const points = parseInt(scorePoints);
       if (!isNaN(points)) {
-        addScore(selectedParticipant.id, activityId, points, scoreReason.trim());
+        await addScore(selectedParticipant.id, activityId, points, scoreReason.trim());
         setScorePoints('');
         setScoreReason('');
         setShowScoreModal(false);
         setSelectedParticipant(null);
-        loadActivityData();
+        await loadActivityData();
       }
     }
   };
@@ -105,14 +139,19 @@ export default function ActivityPage() {
     setShowEditParticipantModal(true);
   };
 
-  const handleUpdateParticipant = (e: React.FormEvent) => {
+  const handleUpdateParticipant = async (e: React.FormEvent) => {
     e.preventDefault();
+    setParticipantError('');
     if (editingParticipant && editParticipantName.trim()) {
-      updateParticipant(editingParticipant.id, editParticipantName.trim());
+      const result = await updateParticipant(editingParticipant.id, editParticipantName.trim());
+      if (result === null) {
+        setParticipantError('此活動中已存在相同姓名的參加者');
+        return;
+      }
       setEditParticipantName('');
       setShowEditParticipantModal(false);
       setEditingParticipant(null);
-      loadActivityData();
+      await loadActivityData();
     }
   };
 
@@ -134,19 +173,21 @@ export default function ActivityPage() {
     }
   };
 
-  const handleBatchAddScore = (e: React.FormEvent) => {
+  const handleBatchAddScore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedParticipants.size > 0 && activityId && batchScorePoints && batchScoreReason.trim()) {
       const points = parseInt(batchScorePoints);
       if (!isNaN(points)) {
-        selectedParticipants.forEach(participantId => {
-          addScore(participantId, activityId, points, batchScoreReason.trim());
-        });
+        await Promise.all(
+          Array.from(selectedParticipants).map(participantId =>
+            addScore(participantId, activityId, points, batchScoreReason.trim())
+          )
+        );
         setBatchScorePoints('');
         setBatchScoreReason('');
         setSelectedParticipants(new Set());
         setShowBatchScoreModal(false);
-        loadActivityData();
+        await loadActivityData();
       }
     }
   };
@@ -158,17 +199,159 @@ export default function ActivityPage() {
     setShowBatchScoreModal(true);
   };
 
+  const handleExportTypeChange = async (type: ExportType) => {
+    setExportType(type);
+    if (type === 'participant-detail') {
+      // 個人明細表預設為空，不選擇參加者
+      setSelectedExportParticipant('');
+      setExportPreview('');
+      setExportPreviewData([]);
+    } else {
+      setSelectedExportParticipant('');
+      await generateExportPreview(type);
+    }
+  };
+
+  const handleExportParticipantChange = async (participantId: string) => {
+    setSelectedExportParticipant(participantId);
+    // 立即清除舊的預覽資料，避免顯示上一個人的資料
+    setExportPreview('');
+    setExportPreviewData([]);
+    if (exportType === 'participant-detail' && participantId) {
+      // 直接傳遞 participantId 參數，避免狀態更新延遲問題
+      await generateParticipantDetailPreview(participantId);
+    }
+  };
+
+  const generateParticipantDetailPreview = async (participantId: string) => {
+    if (!activity) return;
+
+    const selectedParticipant = participants.find(p => p.id === participantId);
+    if (!selectedParticipant) {
+      setExportPreview('');
+      setExportPreviewData([]);
+      return;
+    }
+
+    const scores = await getScoresByParticipant(participantId);
+    
+    // 如果沒有分數記錄
+    if (scores.length === 0) {
+      setExportPreview('');
+      setExportPreviewData([]);
+      return;
+    }
+    
+    const scoresByParticipant = new Map<string, ScoreRecord[]>();
+    scoresByParticipant.set(participantId, scores);
+    
+    const csvContent = generateParticipantDetailCSV(
+      [{ id: selectedParticipant.id, name: selectedParticipant.name }],
+      scoresByParticipant
+    );
+    
+    const previewData = scores.slice(0, 6).map(score => ({
+      參加者: selectedParticipant.name,
+      時間: formatDateTime(score.createdAt),
+      分數: score.points,
+      原因: score.reason,
+    }));
+
+    setExportPreview(csvContent);
+    setExportPreviewData(previewData);
+  };
+
+  const generateExportPreview = async (type: ExportType) => {
+    if (!activity) return;
+
+    let csvContent = '';
+    let previewData: any[] = [];
+
+    switch (type) {
+      case 'score-list':
+        const scoreListData = participants
+          .map(p => ({ name: p.name, totalScore: p.totalScore }))
+          .sort((a, b) => b.totalScore - a.totalScore);
+        csvContent = generateScoreListCSV(scoreListData);
+        previewData = scoreListData.slice(0, 6).map(p => ({
+          參加者: p.name,
+          總分: p.totalScore,
+        }));
+        setExportPreview(csvContent);
+        setExportPreviewData(previewData);
+        break;
+
+      case 'participant-detail':
+        // 個人明細表使用專門的函數處理
+        if (!selectedExportParticipant) {
+          setExportPreview('');
+          setExportPreviewData([]);
+        } else {
+          await generateParticipantDetailPreview(selectedExportParticipant);
+        }
+        break;
+
+      case 'time-sequence':
+        const allScores: ScoreRecord[] = [];
+        const participantMap = new Map<string, { name: string }>();
+        await Promise.all(
+          participants.map(async (p) => {
+            participantMap.set(p.id, { name: p.name });
+            const scores = await getScoresByParticipant(p.id);
+            allScores.push(...scores);
+          })
+        );
+        const sortedScores = allScores.sort((a, b) => 
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+        csvContent = generateTimeSequenceCSV(sortedScores, participantMap);
+        
+        previewData = sortedScores.slice(0, 6).map(score => {
+          const participant = participantMap.get(score.participantId);
+          return {
+            時間: formatDateTime(score.createdAt),
+            參加者: participant?.name || '未知',
+            分數: score.points,
+            原因: score.reason,
+          };
+        });
+        setExportPreview(csvContent);
+        setExportPreviewData(previewData);
+        break;
+    }
+  };
+
+  const openExportModal = async () => {
+    setExportType('score-list');
+    setSelectedExportParticipant('');
+    await generateExportPreview('score-list');
+    setShowExportModal(true);
+  };
+
+  const handleDownloadCSV = () => {
+    if (!activity || !exportPreview) return;
+
+    const typeNames = {
+      'score-list': '分數名單表',
+      'participant-detail': '個人明細表',
+      'time-sequence': '時間序計分表',
+    };
+
+    const filename = `${activity.name}_${typeNames[exportType]}_${new Date().toISOString().split('T')[0]}.csv`;
+    downloadCSV(exportPreview, filename);
+  };
+
   const handleDeleteParticipant = (participant: Participant) => {
     setDeletingParticipant(participant);
     setShowDeleteParticipantModal(true);
   };
 
-  const confirmDeleteParticipant = () => {
+  const confirmDeleteParticipant = async () => {
     if (deletingParticipant) {
-      deleteParticipant(deletingParticipant.id);
+      await deleteParticipant(deletingParticipant.id);
       setShowDeleteParticipantModal(false);
       setDeletingParticipant(null);
-      loadActivityData();
+      await loadActivityData();
     }
   };
 
@@ -207,7 +390,7 @@ export default function ActivityPage() {
     }
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const text = e.target?.result as string;
       try {
         const names = parseCSV(text);
@@ -217,11 +400,16 @@ export default function ActivityPage() {
           return;
         }
 
-        // 批量創建參加者
-        createParticipantsBatch(names, activityId);
+        // 批量創建參加者（會自動過濾重複的）
+        const created = await createParticipantsBatch(names, activityId);
         setShowImportCsvModal(false);
-        loadActivityData();
-        alert(`成功匯入 ${names.length} 位參加者`);
+        await loadActivityData();
+        const skipped = names.length - created.length;
+        if (skipped > 0) {
+          alert(`成功匯入 ${created.length} 位參加者，跳過 ${skipped} 位重複的參加者`);
+        } else {
+          alert(`成功匯入 ${created.length} 位參加者`);
+        }
       } catch (error) {
         console.error('CSV 解析錯誤:', error);
         alert('CSV 檔案解析失敗，請檢查檔案格式');
@@ -230,8 +418,12 @@ export default function ActivityPage() {
     reader.readAsText(file, 'UTF-8');
   };
 
-  if (!user || !activity) {
-    return null;
+  if (loading || !user || !activity) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-gray-600 dark:text-gray-300">載入中...</div>
+      </div>
+    );
   }
 
   return (
@@ -267,12 +459,20 @@ export default function ActivityPage() {
           <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">參加者列表</h2>
           <div className="flex gap-3">
             {participants.length > 0 && (
-              <button
-                onClick={openBatchScoreModal}
-                className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors font-medium"
-              >
-                📊 批量增減分
-              </button>
+              <>
+                <button
+                  onClick={openExportModal}
+                  className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors font-medium"
+                >
+                  📤 匯出 CSV
+                </button>
+                <button
+                  onClick={openBatchScoreModal}
+                  className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors font-medium"
+                >
+                  📊 批量增減分
+                </button>
+              </>
             )}
             <button
               onClick={() => setShowImportCsvModal(true)}
@@ -369,6 +569,11 @@ export default function ActivityPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">新增參加者</h3>
+            {participantError && (
+              <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
+                {participantError}
+              </div>
+            )}
             <form onSubmit={handleAddParticipant} className="space-y-4">
               <div>
                 <label htmlFor="participantName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -390,6 +595,7 @@ export default function ActivityPage() {
                   onClick={() => {
                     setShowAddParticipantModal(false);
                     setNewParticipantName('');
+                    setParticipantError('');
                   }}
                   className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
@@ -474,6 +680,11 @@ export default function ActivityPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">編輯參加者</h3>
+            {participantError && (
+              <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
+                {participantError}
+              </div>
+            )}
             <form onSubmit={handleUpdateParticipant} className="space-y-4">
               <div>
                 <label htmlFor="editParticipantName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -496,6 +707,7 @@ export default function ActivityPage() {
                     setShowEditParticipantModal(false);
                     setEditingParticipant(null);
                     setEditParticipantName('');
+                    setParticipantError('');
                   }}
                   className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
@@ -700,6 +912,166 @@ export default function ActivityPage() {
                   關閉
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CSV 匯出 Modal */}
+      {showExportModal && activity && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
+              匯出活動資料 - {activity.name}
+            </h3>
+            
+            {/* 匯出類型選擇 */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                選擇匯出格式 *
+              </label>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleExportTypeChange('score-list')}
+                  className={`px-4 py-3 rounded-lg border-2 transition-colors ${
+                    exportType === 'score-list'
+                      ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="font-medium">分數名單表</div>
+                  <div className="text-xs mt-1 opacity-75">參加者名稱與總分</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportTypeChange('participant-detail')}
+                  className={`px-4 py-3 rounded-lg border-2 transition-colors ${
+                    exportType === 'participant-detail'
+                      ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="font-medium">個人明細表</div>
+                  <div className="text-xs mt-1 opacity-75">每位參加者的分數明細</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportTypeChange('time-sequence')}
+                  className={`px-4 py-3 rounded-lg border-2 transition-colors ${
+                    exportType === 'time-sequence'
+                      ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="font-medium">時間序計分表</div>
+                  <div className="text-xs mt-1 opacity-75">依時間排序的所有計分記錄</div>
+                </button>
+              </div>
+            </div>
+
+            {/* 個人明細表 - 參加者選擇 */}
+            {exportType === 'participant-detail' && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  選擇參加者 *
+                </label>
+                <select
+                  value={selectedExportParticipant}
+                  onChange={(e) => handleExportParticipantChange(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="">請選擇參加者</option>
+                  {participants.map((participant) => (
+                    <option key={participant.id} value={participant.id}>
+                      {participant.name} (總分: {participant.totalScore > 0 ? '+' : ''}{participant.totalScore})
+                    </option>
+                  ))}
+                </select>
+                {!selectedExportParticipant && (
+                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                    請選擇參加者
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* 預覽區域 */}
+            <div className="flex-1 mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                預覽內容（僅顯示前 6 筆）
+              </label>
+              {exportType === 'participant-detail' && !selectedExportParticipant ? (
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 p-8 text-center">
+                  <p className="text-gray-500 dark:text-gray-400">請選擇參加者以預覽</p>
+                </div>
+              ) : exportType === 'participant-detail' && selectedExportParticipant && exportPreviewData.length === 0 ? (
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 p-8 text-center">
+                  <p className="text-gray-500 dark:text-gray-400">無記錄</p>
+                </div>
+              ) : exportPreviewData.length > 0 ? (
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          {Object.keys(exportPreviewData[0]).map((key) => (
+                            <th
+                              key={key}
+                              className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                            >
+                              {key}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {exportPreviewData.map((row, index) => (
+                          <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            {Object.values(row).map((value: any, cellIndex) => (
+                              <td
+                                key={cellIndex}
+                                className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300"
+                              >
+                                {typeof value === 'number' && value >= 0 ? '+' : ''}
+                                {value}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 p-8 text-center">
+                  <p className="text-gray-500 dark:text-gray-400">請選擇匯出格式...</p>
+                </div>
+              )}
+            </div>
+
+            {/* 操作按鈕 */}
+            <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExportModal(false);
+                  setExportPreview('');
+                  setExportPreviewData([]);
+                  setSelectedExportParticipant('');
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadCSV}
+                disabled={!exportPreview || (exportType === 'participant-detail' && (!selectedExportParticipant || exportPreviewData.length === 0))}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
+              >
+                下載 CSV
+              </button>
             </div>
           </div>
         </div>

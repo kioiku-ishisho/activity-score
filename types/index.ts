@@ -1,13 +1,16 @@
 export interface User {
   id: string;
   username: string;
-  password: string;
+  email: string;
+  createdAt: string;
 }
 
 export interface Activity {
   id: string;
   name: string;
   description?: string;
+  pin: string; // 6位數字 PIN 碼
+  ownerId: string; // 活動擁有者 ID
   createdAt: string;
 }
 
