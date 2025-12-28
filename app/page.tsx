@@ -64,7 +64,8 @@ export default function HomePage() {
     e.preventDefault();
     setActivityError('');
     if (newActivityName.trim() && user) {
-      const result = await createActivity(newActivityName.trim(), newActivityDesc.trim() || undefined, user.id);
+      const descriptionParam = newActivityDesc.trim() || undefined;
+      const result = await createActivity(newActivityName.trim(), descriptionParam, user.id);
       if (result === null) {
         setActivityError('已存在相同名稱和描述的活動');
         return;
@@ -169,14 +170,14 @@ export default function HomePage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <nav className="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">活動計分管理系統</h1>
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 py-3 sm:py-0 sm:h-16">
+            <h1 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100">活動計分管理系統</h1>
+            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end">
               <ThemeToggle />
-              <span className="text-gray-600 dark:text-gray-300">歡迎，{user.username}</span>
+              <span className="text-sm sm:text-base text-gray-600 dark:text-gray-300 truncate max-w-[120px] sm:max-w-none">歡迎，{user.username}</span>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors whitespace-nowrap"
               >
                 登出
               </button>
@@ -185,19 +186,19 @@ export default function HomePage() {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">活動列表</h2>
-          <div className="flex gap-3">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100">活動列表</h2>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={() => setShowPinModal(true)}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors font-medium"
+              className="bg-green-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors font-medium text-sm sm:text-base"
             >
               🔑 輸入 PIN 碼加入活動
             </button>
             <button
               onClick={() => setShowModal(true)}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium"
+              className="bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium text-sm sm:text-base"
             >
               + 新增活動
             </button>
@@ -205,22 +206,22 @@ export default function HomePage() {
         </div>
 
         {activities.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
-            <p className="text-gray-500 dark:text-gray-400 text-lg">尚無活動，請新增第一個活動</p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 sm:p-12 text-center">
+            <p className="text-gray-500 dark:text-gray-400 text-base sm:text-lg">尚無活動，請新增第一個活動</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {activities.map((activity) => (
               <div
                 key={activity.id}
-                className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow p-6"
+                className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow p-4 sm:p-6"
               >
-                <div className="flex justify-between items-start mb-2">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-3 mb-2">
                   <Link
                     href={`/activity/${activity.id}`}
-                    className="flex-1"
+                    className="flex-1 w-full"
                   >
-                    <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2">{activity.name}</h3>
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2 break-words">{activity.name}</h3>
                     {activity.description && (
                       <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">{activity.description}</p>
                     )}
@@ -228,18 +229,18 @@ export default function HomePage() {
                       <p className="text-xs text-gray-400 dark:text-gray-500">
                         建立時間：{new Date(activity.createdAt).toLocaleDateString('zh-TW')}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-mono break-all">
                         PIN 碼：{activity.pin}
                       </p>
                     </div>
                   </Link>
-                  <div className="ml-4 flex flex-col gap-2">
+                  <div className="flex sm:flex-col gap-2 w-full sm:w-auto sm:ml-4">
                     <button
                       onClick={(e) => {
                         e.preventDefault();
                         handleEditActivity(activity);
                       }}
-                      className="px-3 py-1 text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                      className="flex-1 sm:flex-none px-3 py-1.5 text-xs sm:text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                     >
                       編輯
                     </button>
@@ -248,7 +249,7 @@ export default function HomePage() {
                         e.preventDefault();
                         handleHideActivity(activity.id);
                       }}
-                      className="px-3 py-1 text-sm text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                      className="flex-1 sm:flex-none px-3 py-1.5 text-xs sm:text-sm text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                     >
                       移除
                     </button>
@@ -261,8 +262,8 @@ export default function HomePage() {
       </main>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">新增活動</h3>
             {activityError && (
               <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
@@ -324,8 +325,8 @@ export default function HomePage() {
 
       {/* 輸入 PIN 碼 Modal */}
       {showPinModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">輸入 PIN 碼加入活動</h3>
             {pinError && (
               <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
@@ -381,8 +382,8 @@ export default function HomePage() {
 
       {/* 編輯活動 Modal */}
       {editingActivity && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">編輯活動</h3>
             {activityError && (
               <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">

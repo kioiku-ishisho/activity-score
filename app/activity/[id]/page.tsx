@@ -432,45 +432,45 @@ export default function ActivityPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <nav className="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 py-3 sm:py-0 sm:h-16">
+            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
               <Link
                 href="/"
-                className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 transition-colors"
+                className="text-sm sm:text-base text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 transition-colors whitespace-nowrap"
               >
                 ← 返回首頁
               </Link>
-              <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">{activity.name}</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100 truncate flex-1 sm:flex-none">{activity.name}</h1>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end">
               <ThemeToggle />
-              <span className="text-gray-600 dark:text-gray-300">{user.username}</span>
+              <span className="text-sm sm:text-base text-gray-600 dark:text-gray-300 truncate max-w-[120px] sm:max-w-none">{user.username}</span>
             </div>
           </div>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {activity.description && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
-            <p className="text-gray-700 dark:text-gray-300">{activity.description}</p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+            <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300">{activity.description}</p>
           </div>
         )}
 
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">參加者列表</h2>
-          <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100">參加者列表</h2>
+          <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
             {participants.length > 0 && (
               <>
                 <button
                   onClick={openExportModal}
-                  className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors font-medium"
+                  className="bg-indigo-600 text-white px-3 sm:px-6 py-1.5 sm:py-2 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors font-medium text-xs sm:text-base flex-1 sm:flex-none"
                 >
                   📤 匯出 CSV
                 </button>
                 <button
                   onClick={openBatchScoreModal}
-                  className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors font-medium"
+                  className="bg-purple-600 text-white px-3 sm:px-6 py-1.5 sm:py-2 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors font-medium text-xs sm:text-base flex-1 sm:flex-none"
                 >
                   📊 批量增減分
                 </button>
@@ -478,13 +478,13 @@ export default function ActivityPage() {
             )}
             <button
               onClick={() => setShowImportCsvModal(true)}
-              className="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors font-medium"
+              className="bg-orange-600 text-white px-3 sm:px-6 py-1.5 sm:py-2 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors font-medium text-xs sm:text-base flex-1 sm:flex-none"
             >
               📥 CSV 匯入
             </button>
             <button
               onClick={() => setShowAddParticipantModal(true)}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors font-medium"
+              className="bg-green-600 text-white px-3 sm:px-6 py-1.5 sm:py-2 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors font-medium text-xs sm:text-base flex-1 sm:flex-none"
             >
               + 新增參加者
             </button>
@@ -492,84 +492,137 @@ export default function ActivityPage() {
         </div>
 
         {participants.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
-            <p className="text-gray-500 dark:text-gray-400 text-lg">尚無參加者，請新增第一個參加者</p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 sm:p-12 text-center">
+            <p className="text-gray-500 dark:text-gray-400 text-base sm:text-lg">尚無參加者，請新增第一個參加者</p>
           </div>
         ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    參加者
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    總分
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    操作
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {participants.map((participant) => (
-                  <tr key={participant.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Link
-                        href={`/participant/${participant.id}`}
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
-                      >
-                        {participant.name}
-                      </Link>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`text-lg font-semibold ${
-                          participant.totalScore >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                        }`}
-                      >
-                        {participant.totalScore > 0 ? '+' : ''}
-                        {participant.totalScore}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => handleEditParticipant(participant)}
-                        className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 mr-4"
-                      >
-                        編輯
-                      </button>
-                      <button
-                        onClick={() => openScoreModal(participant)}
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mr-4"
-                      >
-                        加減分
-                      </button>
-                      <Link
-                        href={`/participant/${participant.id}`}
-                        className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 mr-4"
-                      >
-                        查看明細
-                      </Link>
-                      <button
-                        onClick={() => handleDeleteParticipant(participant)}
-                        className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-                      >
-                        刪除
-                      </button>
-                    </td>
+          <>
+            {/* 桌面版表格 */}
+            <div className="hidden md:block bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      參加者
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      總分
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      操作
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {participants.map((participant) => (
+                    <tr key={participant.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Link
+                          href={`/participant/${participant.id}`}
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
+                        >
+                          {participant.name}
+                        </Link>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`text-lg font-semibold ${
+                            participant.totalScore >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                          }`}
+                        >
+                          {participant.totalScore > 0 ? '+' : ''}
+                          {participant.totalScore}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => handleEditParticipant(participant)}
+                          className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 mr-4"
+                        >
+                          編輯
+                        </button>
+                        <button
+                          onClick={() => openScoreModal(participant)}
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mr-4"
+                        >
+                          加減分
+                        </button>
+                        <Link
+                          href={`/participant/${participant.id}`}
+                          className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 mr-4"
+                        >
+                          查看明細
+                        </Link>
+                        <button
+                          onClick={() => handleDeleteParticipant(participant)}
+                          className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                        >
+                          刪除
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 手機版卡片 */}
+            <div className="md:hidden space-y-4">
+              {participants.map((participant) => (
+                <div key={participant.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <Link
+                      href={`/participant/${participant.id}`}
+                      className="text-lg font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex-1"
+                    >
+                      {participant.name}
+                    </Link>
+                    <span
+                      className={`text-xl font-bold ml-2 ${
+                        participant.totalScore >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                      }`}
+                    >
+                      {participant.totalScore > 0 ? '+' : ''}
+                      {participant.totalScore}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleEditParticipant(participant)}
+                      className="flex-1 px-3 py-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded transition-colors"
+                    >
+                      編輯
+                    </button>
+                    <button
+                      onClick={() => openScoreModal(participant)}
+                      className="flex-1 px-3 py-2 text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+                    >
+                      加減分
+                    </button>
+                    <Link
+                      href={`/participant/${participant.id}`}
+                      className="flex-1 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition-colors text-center"
+                    >
+                      查看明細
+                    </Link>
+                    <button
+                      onClick={() => handleDeleteParticipant(participant)}
+                      className="flex-1 px-3 py-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                    >
+                      刪除
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </main>
 
       {/* 新增參加者 Modal */}
       {showAddParticipantModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">新增參加者</h3>
             {participantError && (
               <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
@@ -617,8 +670,8 @@ export default function ActivityPage() {
 
       {/* 加減分 Modal */}
       {showScoreModal && selectedParticipant && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">
               為 {selectedParticipant.name} 加減分
             </h3>
@@ -679,8 +732,8 @@ export default function ActivityPage() {
 
       {/* 編輯參加者 Modal */}
       {showEditParticipantModal && editingParticipant && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">編輯參加者</h3>
             {participantError && (
               <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
@@ -729,8 +782,8 @@ export default function ActivityPage() {
 
       {/* 批量增減分 Modal */}
       {showBatchScoreModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">批量增減分</h3>
             <form onSubmit={handleBatchAddScore} className="space-y-4">
               <div>
@@ -834,8 +887,8 @@ export default function ActivityPage() {
 
       {/* 刪除參加者確認 Modal */}
       {showDeleteParticipantModal && deletingParticipant && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">確認刪除</h3>
             <p className="text-gray-700 dark:text-gray-300 mb-6">
               您確定要刪除參加者「<span className="font-semibold">{deletingParticipant.name}</span>」嗎？
@@ -869,8 +922,8 @@ export default function ActivityPage() {
 
       {/* CSV 匯入 Modal */}
       {showImportCsvModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">CSV 匯入參加者</h3>
             <div className="space-y-4">
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
@@ -932,7 +985,7 @@ export default function ActivityPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 選擇匯出格式 *
               </label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => handleExportTypeChange('score-list')}

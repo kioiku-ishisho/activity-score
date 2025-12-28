@@ -31,15 +31,41 @@ export async function createActivity(name: string, description: string | undefin
   try {
     // 檢查是否已存在相同名稱和描述的活動（同一擁有者）
     const activitiesRef = collection(db, 'activities');
-    const q = query(
-      activitiesRef,
-      where('ownerId', '==', ownerId),
-      where('name', '==', name.trim()),
-      where('description', '==', description?.trim() || '')
-    );
+    const trimmedDescription = description?.trim();
+    const hasDescription = !!trimmedDescription;
+    
+    // 如果 description 為空，查詢沒有 description 欄位的文檔；否則查詢 description 欄位等於該值的文檔
+    let q;
+    if (hasDescription) {
+      q = query(
+        activitiesRef,
+        where('ownerId', '==', ownerId),
+        where('name', '==', name.trim()),
+        where('description', '==', trimmedDescription)
+      );
+    } else {
+      // 查詢沒有 description 欄位或 description 為 null 的文檔
+      // 注意：Firestore 無法直接查詢「欄位不存在」，所以我們先查詢所有同名活動，然後在記憶體中過濾
+      q = query(
+        activitiesRef,
+        where('ownerId', '==', ownerId),
+        where('name', '==', name.trim())
+      );
+    }
+    
     const snapshot = await getDocs(q);
     
-    if (!snapshot.empty) {
+    // 如果 description 為空，需要在記憶體中過濾掉有 description 的結果
+    let filteredSnapshot = snapshot;
+    if (!hasDescription) {
+      const filteredDocs = snapshot.docs.filter(doc => {
+        const data = doc.data();
+        return !data.description || data.description === '' || data.description === null;
+      });
+      filteredSnapshot = { ...snapshot, docs: filteredDocs, empty: filteredDocs.length === 0, size: filteredDocs.length } as any;
+    }
+    
+    if (!filteredSnapshot.empty) {
       return null; // 重複
     }
 
@@ -53,21 +79,28 @@ export async function createActivity(name: string, description: string | undefin
       pinExists = !pinSnapshot.empty;
     }
 
-    const newActivity: Omit<Activity, 'id' | 'createdAt'> & { createdAt: any; deleted?: boolean } = {
+    // 處理 description：如果為空則完全省略該欄位（Firestore 不支援 undefined）
+    const activityData: any = {
       name: name.trim(),
-      description: description?.trim() || undefined,
       pin: pin!,
       ownerId,
       deleted: false,
       createdAt: serverTimestamp(),
     };
+    
+    // 只有在 description 有值時才添加該欄位
+    if (trimmedDescription) {
+      activityData.description = trimmedDescription;
+    }
+    
+    const newActivity = activityData;
 
     const docRef = await addDoc(collection(db, 'activities'), newActivity);
     
     return {
       id: docRef.id,
       name: newActivity.name,
-      description: newActivity.description,
+      description: newActivity.description || undefined,
       pin: newActivity.pin,
       ownerId: newActivity.ownerId,
       deleted: false,
