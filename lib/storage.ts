@@ -1,5 +1,10 @@
 import { Activity, Participant, ScoreRecord, User } from '@/types';
 
+// 內部類型：用於 localStorage 的用戶類型（包含密碼）
+interface LocalStorageUser extends User {
+  password: string;
+}
+
 const STORAGE_KEYS = {
   USERS: 'users',
   ACTIVITIES: 'activities',
@@ -14,8 +19,8 @@ function initStorage() {
 
   // 初始化用戶（預設用戶）
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-    const defaultUsers: User[] = [
-      { id: '1', username: 'admin', password: 'admin123' }
+    const defaultUsers: LocalStorageUser[] = [
+      { id: '1', username: 'admin', email: 'admin@example.com', password: 'admin123', createdAt: new Date().toISOString() }
     ];
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(defaultUsers));
   }
@@ -35,12 +40,14 @@ function initStorage() {
 // 用戶相關
 export function login(username: string, password: string): User | null {
   initStorage();
-  const users: User[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
+  const users: LocalStorageUser[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
   const user = users.find(u => u.username === username && u.password === password);
   
   if (user) {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
-    return user;
+    // 移除密碼後返回用戶
+    const { password: _, ...userWithoutPassword } = user;
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(userWithoutPassword));
+    return userWithoutPassword;
   }
   return null;
 }
@@ -55,6 +62,11 @@ export function getCurrentUser(): User | null {
   return userStr ? JSON.parse(userStr) : null;
 }
 
+// 生成 6 位數字 PIN 碼（簡單版本，用於 localStorage）
+function generateSimplePin(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
 // 活動相關
 export function getActivities(): Activity[] {
   initStorage();
@@ -62,7 +74,7 @@ export function getActivities(): Activity[] {
   return activities.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-export function createActivity(name: string, description?: string): Activity | null {
+export function createActivity(name: string, description?: string, ownerId: string = '1'): Activity | null {
   initStorage();
   const activities: Activity[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACTIVITIES) || '[]');
   
@@ -80,6 +92,8 @@ export function createActivity(name: string, description?: string): Activity | n
     id: Date.now().toString(),
     name,
     description,
+    pin: generateSimplePin(),
+    ownerId,
     createdAt: new Date().toISOString(),
   };
   activities.push(newActivity);
