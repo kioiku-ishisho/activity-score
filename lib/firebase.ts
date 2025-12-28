@@ -2,13 +2,41 @@ import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 
-const firebaseConfig = {
+// 驗證必要的環境變數
+const requiredEnvVars = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+};
+
+// 在生產環境中檢查環境變數
+if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+  const missingVars: string[] = [];
+  if (!requiredEnvVars.apiKey) missingVars.push('NEXT_PUBLIC_FIREBASE_API_KEY');
+  if (!requiredEnvVars.authDomain) missingVars.push('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN');
+  if (!requiredEnvVars.projectId) missingVars.push('NEXT_PUBLIC_FIREBASE_PROJECT_ID');
+  if (!requiredEnvVars.storageBucket) missingVars.push('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET');
+  if (!requiredEnvVars.messagingSenderId) missingVars.push('NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID');
+  if (!requiredEnvVars.appId) missingVars.push('NEXT_PUBLIC_FIREBASE_APP_ID');
+  
+  if (missingVars.length > 0) {
+    throw new Error(
+      `缺少必要的 Firebase 環境變數: ${missingVars.join(', ')}\n` +
+      '請在 Render 的環境變數設定中新增這些變數。'
+    );
+  }
+}
+
+const firebaseConfig = {
+  apiKey: requiredEnvVars.apiKey,
+  authDomain: requiredEnvVars.authDomain,
+  projectId: requiredEnvVars.projectId,
+  storageBucket: requiredEnvVars.storageBucket,
+  messagingSenderId: requiredEnvVars.messagingSenderId,
+  appId: requiredEnvVars.appId,
 };
 
 // 初始化 Firebase

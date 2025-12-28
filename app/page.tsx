@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { onAuthStateChange, getCurrentAuthUser, logoutUser, getUserData } from '@/lib/firebase-auth';
-import { getUserActivities, createActivity, updateActivity, getActivityByPin, hideActivity, joinActivity } from '@/lib/firebase-db';
+import { getUserActivities, createActivity, updateActivity, getActivityByPin, hideActivity, joinActivity, restoreActivity } from '@/lib/firebase-db';
 import { Activity, User } from '@/types';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
@@ -93,8 +93,15 @@ export default function HomePage() {
       return;
     }
 
-    // 檢查活動是否已被移除
-    if (activity.deleted) {
+    // 如果活動已被移除，但用戶是活動的擁有者，則恢復活動
+    if (activity.deleted && activity.ownerId === user.id) {
+      const restoreSuccess = await restoreActivity(activity.id, user.id);
+      if (!restoreSuccess) {
+        setPinError('恢復活動失敗，請稍後再試');
+        return;
+      }
+    } else if (activity.deleted) {
+      // 如果活動已被移除且用戶不是擁有者，則拒絕
       setPinError('此活動已被移除');
       return;
     }

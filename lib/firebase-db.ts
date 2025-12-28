@@ -209,6 +209,25 @@ export async function hideActivity(id: string, ownerId: string): Promise<boolean
   }
 }
 
+// 恢復活動（取消已移除標記）
+export async function restoreActivity(id: string, ownerId: string): Promise<boolean> {
+  try {
+    const activity = await getActivity(id);
+    if (!activity || activity.ownerId !== ownerId) {
+      return false;
+    }
+
+    await updateDoc(doc(db, 'activities', id), {
+      deleted: false,
+    });
+
+    return true;
+  } catch (error) {
+    console.error('恢復活動失敗:', error);
+    return false;
+  }
+}
+
 // 用戶參與活動相關
 // 加入活動（建立用戶與活動的關聯）
 export async function joinActivity(userId: string, activityId: string): Promise<boolean> {
@@ -552,23 +571,10 @@ export async function updateScore(id: string, points: number, reason: string): P
 }
 
 export async function getParticipantTotalScore(participantId: string): Promise<number> {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/82d648a9-ecf5-4615-98cb-c5c714638fca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/firebase-db.ts:555',message:'getParticipantTotalScore entry',data:{participantId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
   try {
     const scores = await getScoresByParticipant(participantId);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/82d648a9-ecf5-4615-98cb-c5c714638fca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/firebase-db.ts:558',message:'getParticipantTotalScore after getScoresByParticipant',data:{scoresCount:scores.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
-    const total = scores.reduce((total, score) => total + score.points, 0);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/82d648a9-ecf5-4615-98cb-c5c714638fca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/firebase-db.ts:560',message:'getParticipantTotalScore return',data:{total},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
-    return total;
+    return scores.reduce((total, score) => total + score.points, 0);
   } catch (error) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/82d648a9-ecf5-4615-98cb-c5c714638fca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'lib/firebase-db.ts:562',message:'getParticipantTotalScore error',data:{error:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     console.error('計算總分失敗:', error);
     return 0;
   }
