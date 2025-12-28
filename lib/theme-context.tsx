@@ -56,8 +56,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
 export function useTheme() {
   const context = useContext(ThemeContext);
+  // 在服務器端渲染或沒有 ThemeProvider 時返回默認值
   if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
+    // 返回默認值，避免服務器端渲染錯誤
+    return {
+      theme: 'light' as Theme,
+      toggleTheme: () => {},
+    };
   }
   return context;
 }

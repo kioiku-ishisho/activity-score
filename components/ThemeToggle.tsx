@@ -5,13 +5,14 @@ import { useTheme } from '@/lib/theme-context';
 
 export function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
+  // 總是調用 useTheme，符合 React Hooks 規則
+  const { theme, toggleTheme } = useTheme();
   
-  // 只在客戶端掛載後使用 useTheme
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // 如果未掛載，返回一個默認按鈕（服務器端渲染）
+  // 如果未掛載（服務器端渲染），返回一個默認按鈕
   if (!mounted) {
     return (
       <button
@@ -37,9 +38,7 @@ export function ThemeToggle() {
     );
   }
 
-  // 客戶端渲染時使用 useTheme
-  const { theme, toggleTheme } = useTheme();
-
+  // 客戶端渲染時顯示實際主題
   return (
     <button
       onClick={toggleTheme}
