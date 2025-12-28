@@ -96,3 +96,4 @@ choirapp/
 - `npm start` - 啟動生產伺服器
 - `npm run lint` - 執行 ESLint 檢查
 
+# activity-score
