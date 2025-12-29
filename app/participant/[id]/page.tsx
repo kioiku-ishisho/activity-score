@@ -77,13 +77,6 @@ export default function ParticipantPage() {
 
   const handleAddScore = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // 驗證字數限制
-    if (addScoreReason.trim().length > 200) {
-      alert('加減分原因不能超過 200 字元');
-      return;
-    }
-    
     if (participant && activity && addScorePoints && addScoreReason.trim()) {
       const points = parseInt(addScorePoints);
       if (!isNaN(points)) {
@@ -98,13 +91,6 @@ export default function ParticipantPage() {
 
   const handleUpdateScore = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // 驗證字數限制
-    if (editScoreReason.trim().length > 200) {
-      alert('加減分原因不能超過 200 字元');
-      return;
-    }
-    
     if (editingScore && editScorePoints && editScoreReason.trim()) {
       const points = parseInt(editScorePoints);
       if (!isNaN(points)) {
@@ -127,7 +113,7 @@ export default function ParticipantPage() {
   }
 
   return (
-    <div className="w-full min-h-full bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <nav className="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 py-3 sm:py-0 sm:h-16">
@@ -298,7 +284,7 @@ export default function ParticipantPage() {
                 </div>
                 <div>
                   <label htmlFor="addReason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    原因 * <span className="text-xs text-gray-500 dark:text-gray-400">（最多 200 字元）</span>
+                    原因 *
                   </label>
                   <textarea
                     id="addReason"
@@ -306,13 +292,9 @@ export default function ParticipantPage() {
                     onChange={(e) => setAddScoreReason(e.target.value)}
                     required
                     rows={3}
-                    maxLength={200}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="請輸入加減分原因"
                   />
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-right">
-                    {addScoreReason.length}/200
-                  </p>
                 </div>
                 <div className="flex gap-3 justify-end">
                   <button

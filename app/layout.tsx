@@ -18,7 +18,7 @@ export default function RootLayout({
       <body className="flex flex-col min-h-screen">
         <ThemeProvider>
           <div className="flex flex-col min-h-screen">
-            <main className="flex-1">
+            <main className="flex-1 pb-20 sm:pb-24">
               {children}
             </main>
             <Footer />
