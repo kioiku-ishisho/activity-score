@@ -20,7 +20,7 @@ function initStorage() {
   // 初始化用戶（預設用戶）
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
     const defaultUsers: LocalStorageUser[] = [
-      { id: '1', username: 'admin', email: 'admin@example.com', password: 'admin123', createdAt: new Date().toISOString() }
+      { id: '1', username: 'admin', userCode: '000000', password: 'admin123', createdAt: new Date().toISOString() }
     ];
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(defaultUsers));
   }

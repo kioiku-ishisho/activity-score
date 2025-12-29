@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { onAuthStateChange, getUserData } from '@/lib/firebase-auth';
+import { onAuthStateChange } from '@/lib/firebase-auth';
 import {
   getParticipant,
   getActivity,
@@ -36,17 +36,14 @@ export default function ParticipantPage() {
   const [editScoreReason, setEditScoreReason] = useState('');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChange(async (firebaseUser) => {
-      if (!firebaseUser) {
+    const unsubscribe = onAuthStateChange(async (userData) => {
+      if (!userData) {
         router.push('/login');
         return;
       }
       
-      const userData = await getUserData(firebaseUser.uid);
-      if (userData) {
-        setUser(userData);
-        await loadParticipantData();
-      }
+      setUser(userData);
+      await loadParticipantData();
       setLoading(false);
     });
 
@@ -80,6 +77,13 @@ export default function ParticipantPage() {
 
   const handleAddScore = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 驗證字數限制
+    if (addScoreReason.trim().length > 200) {
+      alert('加減分原因不能超過 200 字元');
+      return;
+    }
+    
     if (participant && activity && addScorePoints && addScoreReason.trim()) {
       const points = parseInt(addScorePoints);
       if (!isNaN(points)) {
@@ -94,6 +98,13 @@ export default function ParticipantPage() {
 
   const handleUpdateScore = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 驗證字數限制
+    if (editScoreReason.trim().length > 200) {
+      alert('加減分原因不能超過 200 字元');
+      return;
+    }
+    
     if (editingScore && editScorePoints && editScoreReason.trim()) {
       const points = parseInt(editScorePoints);
       if (!isNaN(points)) {
@@ -287,7 +298,7 @@ export default function ParticipantPage() {
                 </div>
                 <div>
                   <label htmlFor="addReason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    原因 *
+                    原因 * <span className="text-xs text-gray-500 dark:text-gray-400">（最多 200 字元）</span>
                   </label>
                   <textarea
                     id="addReason"
@@ -295,9 +306,13 @@ export default function ParticipantPage() {
                     onChange={(e) => setAddScoreReason(e.target.value)}
                     required
                     rows={3}
+                    maxLength={200}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="請輸入加減分原因"
                   />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-right">
+                    {addScoreReason.length}/200
+                  </p>
                 </div>
                 <div className="flex gap-3 justify-end">
                   <button

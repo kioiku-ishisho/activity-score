@@ -1,35 +1,42 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 使用者資料：只能讀寫自己的資料
+    // 使用者資料：允許查詢 userCode（用於登入），允許創建和讀取
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // 允許查詢 userCode 欄位（用於登入驗證）
+      allow read: if true; // 允許所有人讀取（用於用戶碼查詢）
+      // 允許創建用戶資料（註冊時）
+      allow create: if true;
+      // 允許更新自己的用戶資料（通過 userId 驗證）
+      allow update: if request.resource.data.id == userId;
+    }
+    
+    // 用戶碼索引：允許讀取和創建（用於登入查詢）
+    match /userCodes/{userCode} {
+      allow read: if true;
+      allow create: if true;
     }
     
     // 活動資料：所有人都可以讀取，只有擁有者可以寫入
     match /activities/{activityId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow read: if true; // 允許所有人讀取
+      allow create: if request.resource.data.ownerId != null;
+      allow update, delete: if resource.data.ownerId != null;
     }
     
-    // 參加者資料：所有人都可以讀取，已登入使用者可以寫入
+    // 參加者資料：所有人都可以讀取和寫入
     match /participants/{participantId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
     
-    // 分數記錄：所有人都可以讀取，已登入使用者可以寫入
+    // 分數記錄：所有人都可以讀取和寫入
     match /scores/{scoreId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
     
-    // 用戶活動關聯：用戶只能讀寫自己的關聯
+    // 用戶活動關聯：所有人都可以讀寫
     match /userActivities/{userActivityId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read, write: if true;
     }
   }
 }

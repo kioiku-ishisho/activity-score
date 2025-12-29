@@ -27,8 +27,16 @@ function timestampToISO(timestamp: any): string {
 }
 
 // 活動相關
-export async function createActivity(name: string, description: string | undefined, ownerId: string): Promise<Activity | null> {
+export async function createActivity(name: string, description: string | undefined, ownerId: string, ownerUsername?: string): Promise<Activity | null> {
   try {
+    // 驗證字數限制
+    if (name.trim().length > 50) {
+      throw new Error('活動名稱不能超過 50 字元');
+    }
+    if (description && description.trim().length > 500) {
+      throw new Error('活動說明不能超過 500 字元');
+    }
+    
     // 檢查是否已存在相同名稱和描述的活動（同一擁有者）
     const activitiesRef = collection(db, 'activities');
     const trimmedDescription = description?.trim();
@@ -93,6 +101,11 @@ export async function createActivity(name: string, description: string | undefin
       activityData.description = trimmedDescription;
     }
     
+    // 如果有提供建立者用戶名，則存儲
+    if (ownerUsername) {
+      activityData.ownerUsername = ownerUsername;
+    }
+    
     const newActivity = activityData;
 
     const docRef = await addDoc(collection(db, 'activities'), newActivity);
@@ -103,6 +116,7 @@ export async function createActivity(name: string, description: string | undefin
       description: newActivity.description || undefined,
       pin: newActivity.pin,
       ownerId: newActivity.ownerId,
+      ownerUsername: newActivity.ownerUsername || undefined,
       deleted: false,
       createdAt: new Date().toISOString(),
     };
@@ -338,6 +352,11 @@ export async function getUserActivities(userId: string): Promise<Activity[]> {
 // 參加者相關
 export async function createParticipant(name: string, activityId: string): Promise<Participant | null> {
   try {
+    // 驗證字數限制
+    if (name.trim().length > 50) {
+      throw new Error('參加者名稱不能超過 50 字元');
+    }
+    
     // 檢查同一活動中是否已存在相同姓名的參加者
     const participantsRef = collection(db, 'participants');
     const q = query(
@@ -449,6 +468,11 @@ export async function getParticipant(id: string): Promise<Participant | null> {
 
 export async function updateParticipant(id: string, name: string): Promise<Participant | null> {
   try {
+    // 驗證字數限制
+    if (name.trim().length > 50) {
+      throw new Error('參加者名稱不能超過 50 字元');
+    }
+    
     const participant = await getParticipant(id);
     if (!participant) {
       return null;
@@ -501,6 +525,11 @@ export async function deleteParticipant(id: string): Promise<boolean> {
 // 分數相關
 export async function addScore(participantId: string, activityId: string, points: number, reason: string): Promise<ScoreRecord | null> {
   try {
+    // 驗證字數限制
+    if (reason.trim().length > 200) {
+      throw new Error('加減分原因不能超過 200 字元');
+    }
+    
     const newScore: Omit<ScoreRecord, 'id' | 'createdAt'> & { createdAt: any } = {
       participantId,
       activityId,
@@ -580,6 +609,11 @@ export async function getScoresByActivity(activityId: string): Promise<ScoreReco
 
 export async function updateScore(id: string, points: number, reason: string): Promise<ScoreRecord | null> {
   try {
+    // 驗證字數限制
+    if (reason.trim().length > 200) {
+      throw new Error('加減分原因不能超過 200 字元');
+    }
+    
     await updateDoc(doc(db, 'scores', id), {
       points,
       reason: reason.trim(),

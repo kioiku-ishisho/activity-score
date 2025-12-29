@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { onAuthStateChange, getCurrentAuthUser, logoutUser, getUserData } from '@/lib/firebase-auth';
+import { onAuthStateChange, getCurrentUser, logoutUser } from '@/lib/firebase-auth';
 import { getUserActivities, createActivity, updateActivity, getActivityByPin, hideActivity, joinActivity, restoreActivity } from '@/lib/firebase-db';
 import { Activity, User } from '@/types';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -28,20 +28,16 @@ export default function HomePage() {
   const [activityError, setActivityError] = useState('');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChange(async (firebaseUser) => {
-      if (!firebaseUser) {
+    const unsubscribe = onAuthStateChange(async (userData) => {
+      if (!userData) {
         router.push('/login');
         return;
       }
       
-      // 取得使用者資料
-      const userData = await getUserData(firebaseUser.uid);
-      if (userData) {
-        setUser(userData);
-        // 載入該使用者的活動列表（包括擁有的和加入的）
-        const userActivities = await getUserActivities(firebaseUser.uid);
-        setActivities(userActivities);
-      }
+      setUser(userData);
+      // 載入該使用者的活動列表（包括擁有的和加入的）
+      const userActivities = await getUserActivities(userData.id);
+      setActivities(userActivities);
       setLoading(false);
     });
 
@@ -63,9 +59,20 @@ export default function HomePage() {
   const handleCreateActivity = async (e: React.FormEvent) => {
     e.preventDefault();
     setActivityError('');
+    
+    // 驗證字數限制
+    if (newActivityName.trim().length > 50) {
+      setActivityError('活動名稱不能超過 50 字元');
+      return;
+    }
+    if (newActivityDesc.trim().length > 500) {
+      setActivityError('活動說明不能超過 500 字元');
+      return;
+    }
+    
     if (newActivityName.trim() && user) {
       const descriptionParam = newActivityDesc.trim() || undefined;
-      const result = await createActivity(newActivityName.trim(), descriptionParam, user.id);
+      const result = await createActivity(newActivityName.trim(), descriptionParam, user.id, user.username);
       if (result === null) {
         setActivityError('已存在相同名稱和描述的活動');
         return;
@@ -229,6 +236,11 @@ export default function HomePage() {
                       <p className="text-xs text-gray-400 dark:text-gray-500">
                         建立時間：{new Date(activity.createdAt).toLocaleDateString('zh-TW')}
                       </p>
+                      {activity.ownerUsername && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          建立者：{activity.ownerUsername}
+                        </p>
+                      )}
                       <p className="text-xs text-gray-500 dark:text-gray-400 font-mono break-all">
                         PIN 碼：{activity.pin}
                       </p>
@@ -273,7 +285,7 @@ export default function HomePage() {
             <form onSubmit={handleCreateActivity} className="space-y-4">
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  活動名稱 *
+                  活動名稱 * <span className="text-xs text-gray-500 dark:text-gray-400">（最多 50 字元）</span>
                 </label>
                 <input
                   id="name"
@@ -281,22 +293,30 @@ export default function HomePage() {
                   value={newActivityName}
                   onChange={(e) => setNewActivityName(e.target.value)}
                   required
+                  maxLength={50}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="請輸入活動名稱"
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-right">
+                  {newActivityName.length}/50
+                </p>
               </div>
               <div>
                 <label htmlFor="desc" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  活動說明
+                  活動說明 <span className="text-xs text-gray-500 dark:text-gray-400">（最多 500 字元）</span>
                 </label>
                 <textarea
                   id="desc"
                   value={newActivityDesc}
                   onChange={(e) => setNewActivityDesc(e.target.value)}
                   rows={3}
+                  maxLength={500}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="請輸入活動說明（選填）"
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-right">
+                  {newActivityDesc.length}/500
+                </p>
               </div>
               <div className="flex gap-3 justify-end">
                 <button
@@ -393,7 +413,7 @@ export default function HomePage() {
             <form onSubmit={handleUpdateActivity} className="space-y-4">
               <div>
                 <label htmlFor="editName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  活動名稱 *
+                  活動名稱 * <span className="text-xs text-gray-500 dark:text-gray-400">（最多 50 字元）</span>
                 </label>
                 <input
                   id="editName"
@@ -401,22 +421,30 @@ export default function HomePage() {
                   value={editActivityName}
                   onChange={(e) => setEditActivityName(e.target.value)}
                   required
+                  maxLength={50}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="請輸入活動名稱"
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-right">
+                  {editActivityName.length}/50
+                </p>
               </div>
               <div>
                 <label htmlFor="editDesc" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  活動說明
+                  活動說明 <span className="text-xs text-gray-500 dark:text-gray-400">（最多 500 字元）</span>
                 </label>
                 <textarea
                   id="editDesc"
                   value={editActivityDesc}
                   onChange={(e) => setEditActivityDesc(e.target.value)}
                   rows={3}
+                  maxLength={500}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="請輸入活動說明（選填）"
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-right">
+                  {editActivityDesc.length}/500
+                </p>
               </div>
               <div className="flex gap-3 justify-end">
                 <button

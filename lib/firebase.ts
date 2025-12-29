@@ -61,6 +61,11 @@ export function generatePin(): string {
   return pin;
 }
 
+// 生成 6 位數字用戶碼（非流水號，與 PIN 碼邏輯相同）
+export function generateUserCode(): string {
+  return generatePin();
+}
+
 // 檢查是否為流水號（如 123456, 654321, 111111 等）
 function isSequentialPin(pin: string): boolean {
   // 檢查是否為相同數字（如 111111）
