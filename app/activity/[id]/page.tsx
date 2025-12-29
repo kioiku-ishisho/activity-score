@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { onAuthStateChange, getUserData } from '@/lib/firebase-auth';
+import { onAuthStateChange } from '@/lib/firebase-auth';
 import {
   getActivity,
   getParticipantsByActivity,
@@ -13,7 +13,6 @@ import {
   deleteParticipant,
   getScoresByActivity,
   addScore,
-  getParticipantTotalScore,
   getScoresByParticipant,
 } from '@/lib/firebase-db';
 import { Activity, Participant, ParticipantWithScore, ScoreRecord, User } from '@/types';
@@ -60,17 +59,14 @@ export default function ActivityPage() {
   const [batchScoreReason, setBatchScoreReason] = useState('');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChange(async (firebaseUser) => {
-      if (!firebaseUser) {
+    const unsubscribe = onAuthStateChange(async (userData) => {
+      if (!userData) {
         router.push('/login');
         return;
       }
       
-      const userData = await getUserData(firebaseUser.uid);
-      if (userData) {
-        setUser(userData);
-        await loadActivityData();
-      }
+      setUser(userData);
+      await loadActivityData();
       setLoading(false);
     });
 
@@ -85,22 +81,37 @@ export default function ActivityPage() {
     }
     setActivity(activityData);
 
-    const participantsData = await getParticipantsByActivity(activityId);
-    const participantsWithScores: ParticipantWithScore[] = await Promise.all(
-      participantsData.map(async (p) => {
-        const totalScore = await getParticipantTotalScore(p.id);
-        return {
-          ...p,
-          totalScore,
-        };
-      })
-    );
+    // 並行載入參加者和分數記錄，避免 N+1 查詢問題
+    const [participantsData, scoresData] = await Promise.all([
+      getParticipantsByActivity(activityId),
+      getScoresByActivity(activityId),
+    ]);
+
+    // 在記憶體中計算每個參加者的總分
+    const scoreMap = new Map<string, number>();
+    scoresData.forEach(score => {
+      const currentTotal = scoreMap.get(score.participantId) || 0;
+      scoreMap.set(score.participantId, currentTotal + score.points);
+    });
+
+    const participantsWithScores: ParticipantWithScore[] = participantsData.map(p => ({
+      ...p,
+      totalScore: scoreMap.get(p.id) || 0,
+    }));
+
     setParticipants(participantsWithScores);
   };
 
   const handleAddParticipant = async (e: React.FormEvent) => {
     e.preventDefault();
     setParticipantError('');
+    
+    // 驗證字數限制
+    if (newParticipantName.trim().length > 50) {
+      setParticipantError('參加者名稱不能超過 50 字元');
+      return;
+    }
+    
     if (newParticipantName.trim() && activityId) {
       const result = await createParticipant(newParticipantName.trim(), activityId);
       if (result === null) {
@@ -115,6 +126,14 @@ export default function ActivityPage() {
 
   const handleAddScore = async (e: React.FormEvent) => {
     e.preventDefault();
+    setParticipantError('');
+    
+    // 驗證字數限制
+    if (scoreReason.trim().length > 200) {
+      setParticipantError('加減分原因不能超過 200 字元');
+      return;
+    }
+    
     if (selectedParticipant && activityId && scorePoints && scoreReason.trim()) {
       const points = parseInt(scorePoints);
       if (!isNaN(points)) {
@@ -144,6 +163,13 @@ export default function ActivityPage() {
   const handleUpdateParticipant = async (e: React.FormEvent) => {
     e.preventDefault();
     setParticipantError('');
+    
+    // 驗證字數限制
+    if (editParticipantName.trim().length > 50) {
+      setParticipantError('參加者名稱不能超過 50 字元');
+      return;
+    }
+    
     if (editingParticipant && editParticipantName.trim()) {
       const result = await updateParticipant(editingParticipant.id, editParticipantName.trim());
       if (result === null) {
@@ -177,6 +203,14 @@ export default function ActivityPage() {
 
   const handleBatchAddScore = async (e: React.FormEvent) => {
     e.preventDefault();
+    setParticipantError('');
+    
+    // 驗證字數限制
+    if (batchScoreReason.trim().length > 200) {
+      setParticipantError('加減分原因不能超過 200 字元');
+      return;
+    }
+    
     if (selectedParticipants.size > 0 && activityId && batchScorePoints && batchScoreReason.trim()) {
       const points = parseInt(batchScorePoints);
       if (!isNaN(points)) {
@@ -451,11 +485,24 @@ export default function ActivityPage() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {activity.description && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
-            <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300">{activity.description}</p>
+        {/* 活動資訊卡片 */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+          {activity.description && (
+            <div className="mb-3">
+              <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300">{activity.description}</p>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-4 text-sm sm:text-base text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">建立者：</span>
+              <span className="text-gray-800 dark:text-gray-200">{activity.ownerUsername || '未知'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">PIN 碼：</span>
+              <span className="font-mono text-gray-800 dark:text-gray-200">{activity.pin}</span>
+            </div>
           </div>
-        )}
+        </div>
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100">參加者列表</h2>
@@ -515,14 +562,15 @@ export default function ActivityPage() {
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {participants.map((participant) => (
-                    <tr key={participant.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <tr 
+                      key={participant.id} 
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                      onClick={() => router.push(`/participant/${participant.id}`)}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Link
-                          href={`/participant/${participant.id}`}
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
-                        >
+                        <span className="text-gray-900 dark:text-gray-100 font-medium">
                           {participant.name}
-                        </Link>
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
@@ -534,7 +582,7 @@ export default function ActivityPage() {
                           {participant.totalScore}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => handleEditParticipant(participant)}
                           className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 mr-4"
@@ -547,12 +595,6 @@ export default function ActivityPage() {
                         >
                           加減分
                         </button>
-                        <Link
-                          href={`/participant/${participant.id}`}
-                          className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 mr-4"
-                        >
-                          查看明細
-                        </Link>
                         <button
                           onClick={() => handleDeleteParticipant(participant)}
                           className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
@@ -569,14 +611,15 @@ export default function ActivityPage() {
             {/* 手機版卡片 */}
             <div className="md:hidden space-y-4">
               {participants.map((participant) => (
-                <div key={participant.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                <div 
+                  key={participant.id} 
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => router.push(`/participant/${participant.id}`)}
+                >
                   <div className="flex justify-between items-start mb-3">
-                    <Link
-                      href={`/participant/${participant.id}`}
-                      className="text-lg font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex-1"
-                    >
+                    <span className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex-1">
                       {participant.name}
-                    </Link>
+                    </span>
                     <span
                       className={`text-xl font-bold ml-2 ${
                         participant.totalScore >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
@@ -586,7 +629,7 @@ export default function ActivityPage() {
                       {participant.totalScore}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => handleEditParticipant(participant)}
                       className="flex-1 px-3 py-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded transition-colors"
@@ -599,12 +642,6 @@ export default function ActivityPage() {
                     >
                       加減分
                     </button>
-                    <Link
-                      href={`/participant/${participant.id}`}
-                      className="flex-1 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition-colors text-center"
-                    >
-                      查看明細
-                    </Link>
                     <button
                       onClick={() => handleDeleteParticipant(participant)}
                       className="flex-1 px-3 py-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
@@ -632,7 +669,7 @@ export default function ActivityPage() {
             <form onSubmit={handleAddParticipant} className="space-y-4">
               <div>
                 <label htmlFor="participantName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  參加者名稱 *
+                  參加者名稱 * <span className="text-xs text-gray-500 dark:text-gray-400">（最多 50 字元）</span>
                 </label>
                 <input
                   id="participantName"
@@ -640,9 +677,13 @@ export default function ActivityPage() {
                   value={newParticipantName}
                   onChange={(e) => setNewParticipantName(e.target.value)}
                   required
+                  maxLength={50}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   placeholder="請輸入參加者名稱"
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-right">
+                  {newParticipantName.length}/50
+                </p>
               </div>
               <div className="flex gap-3 justify-end">
                 <button
@@ -693,7 +734,7 @@ export default function ActivityPage() {
               </div>
               <div>
                 <label htmlFor="reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  原因 *
+                  原因 * <span className="text-xs text-gray-500 dark:text-gray-400">（最多 200 字元）</span>
                 </label>
                 <textarea
                   id="reason"
@@ -701,9 +742,13 @@ export default function ActivityPage() {
                   onChange={(e) => setScoreReason(e.target.value)}
                   required
                   rows={3}
+                  maxLength={200}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="請輸入加減分原因"
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-right">
+                  {scoreReason.length}/200
+                </p>
               </div>
               <div className="flex gap-3 justify-end">
                 <button
@@ -743,7 +788,7 @@ export default function ActivityPage() {
             <form onSubmit={handleUpdateParticipant} className="space-y-4">
               <div>
                 <label htmlFor="editParticipantName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  參加者名稱 *
+                  參加者名稱 * <span className="text-xs text-gray-500 dark:text-gray-400">（最多 50 字元）</span>
                 </label>
                 <input
                   id="editParticipantName"
@@ -751,9 +796,13 @@ export default function ActivityPage() {
                   value={editParticipantName}
                   onChange={(e) => setEditParticipantName(e.target.value)}
                   required
+                  maxLength={50}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   placeholder="請輸入參加者名稱"
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-right">
+                  {editParticipantName.length}/50
+                </p>
               </div>
               <div className="flex gap-3 justify-end">
                 <button
@@ -803,7 +852,7 @@ export default function ActivityPage() {
               </div>
               <div>
                 <label htmlFor="batchReason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  原因 *
+                  原因 * <span className="text-xs text-gray-500 dark:text-gray-400">（最多 200 字元）</span>
                 </label>
                 <textarea
                   id="batchReason"
@@ -811,9 +860,13 @@ export default function ActivityPage() {
                   onChange={(e) => setBatchScoreReason(e.target.value)}
                   required
                   rows={3}
+                  maxLength={200}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   placeholder="請輸入加減分原因"
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-right">
+                  {batchScoreReason.length}/200
+                </p>
               </div>
               <div>
                 <div className="flex justify-between items-center mb-3">

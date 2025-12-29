@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { registerUser, loginUser } from '@/lib/firebase-auth';
+import { registerUser, loginUserByCode, getCurrentUser } from '@/lib/firebase-auth';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 // 強制動態渲染，避免預渲染時 ThemeProvider 未初始化
@@ -11,48 +11,61 @@ export const dynamic = 'force-dynamic';
 export default function LoginPage() {
   const router = useRouter();
   const [isRegister, setIsRegister] = useState(false);
-  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [userCode, setUserCode] = useState('');
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [registeredUserCode, setRegisteredUserCode] = useState<string | null>(null);
+
+  // 檢查是否已登入
+  useEffect(() => {
+    const checkAuth = async () => {
+      const user = await getCurrentUser();
+      if (user) {
+        router.push('/');
+      }
+    };
+    checkAuth();
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
+    setRegisteredUserCode(null);
 
     if (isRegister) {
       // 註冊流程
-      if (!email.trim() || !username.trim() || !password.trim()) {
-        setError('請填寫所有欄位');
+      if (!username.trim()) {
+        setError('請輸入使用者名稱');
         return;
       }
 
-      if (password.length < 6) {
-        setError('密碼長度至少需要 6 個字元');
-        return;
-      }
-
-      if (password !== confirmPassword) {
-        setError('密碼與確認密碼不一致');
-        return;
-      }
-
-      const result = await registerUser(email.trim(), password, username.trim());
+      const result = await registerUser(username.trim());
       if (result.error) {
         setError(result.error);
-      } else {
-        router.push('/');
-        router.refresh();
+      } else if (result.user && result.userCode) {
+        setSuccessMessage(`註冊成功！您的用戶碼是：${result.userCode}，請妥善保管。`);
+        setRegisteredUserCode(result.userCode);
+        // 3 秒後自動跳轉
+        setTimeout(() => {
+          router.push('/');
+          router.refresh();
+        }, 3000);
       }
     } else {
       // 登入流程
-      if (!email.trim() || !password.trim()) {
-        setError('請填寫所有欄位');
+      if (!userCode.trim()) {
+        setError('請輸入用戶碼');
         return;
       }
 
-      const result = await loginUser(email.trim(), password);
+      if (userCode.trim().length !== 6 || !/^\d{6}$/.test(userCode.trim())) {
+        setError('用戶碼必須為 6 位數字');
+        return;
+      }
+
+      const result = await loginUserByCode(userCode.trim());
       if (result.error) {
         setError(result.error);
       } else {
@@ -103,74 +116,75 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-          {isRegister && (
+          {isRegister ? (
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                使用者名稱
+                使用者名稱 *
               </label>
               <input
                 id="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                required={isRegister}
+                required
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="請輸入使用者名稱"
+                disabled={!!registeredUserCode}
               />
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                註冊後系統會自動配發一個 6 位數字的用戶碼，請妥善保管以便後續登入
+              </p>
             </div>
-          )}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              電子郵件
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="請輸入電子郵件"
-            />
-          </div>
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              密碼
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder={isRegister ? '請輸入密碼（至少 6 個字元）' : '請輸入密碼'}
-            />
-          </div>
-          {isRegister && (
+          ) : (
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                確認密碼
+              <label htmlFor="userCode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                用戶碼（6 位數字）*
               </label>
               <input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required={isRegister}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="請再次輸入密碼"
+                id="userCode"
+                type="text"
+                value={userCode}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setUserCode(value);
+                  setError('');
+                }}
+                required
+                maxLength={6}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl font-mono tracking-widest"
+                placeholder="000000"
               />
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                請輸入您的 6 位數字用戶碼以登入系統
+              </p>
             </div>
           )}
+          
           {error && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg">
               {error}
             </div>
           )}
+          
+          {successMessage && registeredUserCode && (
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded-lg">
+              <p className="font-semibold mb-2">{successMessage}</p>
+              <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded border-2 border-green-500">
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">您的用戶碼：</p>
+                <p className="text-3xl font-mono font-bold text-center text-green-600 dark:text-green-400 tracking-widest">
+                  {registeredUserCode}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+                  請記下此用戶碼，登入時需要使用
+                </p>
+              </div>
+            </div>
+          )}
+          
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium"
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!!registeredUserCode}
           >
             {isRegister ? '註冊' : '登入'}
           </button>
