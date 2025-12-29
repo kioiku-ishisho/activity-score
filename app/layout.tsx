@@ -17,10 +17,12 @@ export default function RootLayout({
     <html lang="zh-TW" suppressHydrationWarning>
       <body className="flex flex-col min-h-screen">
         <ThemeProvider>
-          <div className="flex-1">
-            {children}
+          <div className="flex flex-col min-h-screen">
+            <main className="flex-1">
+              {children}
+            </main>
+            <Footer />
           </div>
-          <Footer />
         </ThemeProvider>
       </body>
     </html>
